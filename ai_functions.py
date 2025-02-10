@@ -1,20 +1,47 @@
 import transformers
-from transformers import pipeline
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import torch
+from transformers import AutoModelForSequenceClassification, AutoTokenizer, AutoModel
+import numpy as np
+import pandas as pd
+import umap.umap_ as umap
 
 class ProductAttributeExtractor:
-    def __init__(self, model_name='distilbert-base-uncased'):
-        self.nlp = pipeline('feature-extraction', model=model_name)
-        self.sentiment_analysis = pipeline('sentiment-analysis', model=model_name)
+    def __init__(self, sentiment_model_name='distilbert-base-uncased', feature_model_name='BAAI/bge-small-en-v1.5'):
+        self.feature_tokenizer = AutoTokenizer.from_pretrained(feature_model_name)
+        self.feature_model = AutoModel.from_pretrained(feature_model_name)
+
+        self.sentiment_tokenizer = AutoTokenizer.from_pretrained(sentiment_model_name)
+        self.sentiment_model = AutoModelForSequenceClassification.from_pretrained(sentiment_model_name)
+
+    def extract_common_features(self, text_list, n_dimensions):
+        '''
+        Extracts common features from a list of product descriptions.
+        Returns a list of n common features.
+        '''
+        # Prepare data for feature extraction
+        text_clean = ["Represent this sentence for searching relevant passages: " + desc for desc in text_list]
         
-    def extract_common_features(self, product_descriptions, n):
-        # (1) Determine a set of n common product features from all product descriptions
-        features = []
-        for description in product_descriptions:
-            features.append(self.nlp(description))
-        # Process features to find common ones
-        common_features = self._find_common_features(features, n)
-        return common_features
+        # Tokenize texts
+        encoded_inputs = self.feature_tokenizer(
+            text_clean,
+            padding=True,
+            truncation=True,
+            max_length=512,
+            return_tensors='pt'
+        )
+
+        # Create embeddings for each product description
+        with torch.no_grad():
+            feature_outputs = self.feature_model(**encoded_inputs)
+
+            embeddings = feature_outputs.last_hidden_state[:, 0].numpy()
+
+        # Reduce dimensionality of embeddings
+        # JA LEFT OFF HERE
+
+        # Cluster embeddings to find common features
+
+        # Create new cluster labels for each product description
 
     def extract_product_features(self, product_description, common_features):
         # (2) Determine each product's features from within the larger set
@@ -35,21 +62,3 @@ class ProductAttributeExtractor:
             sentiments.append(self.sentiment_analysis(review))
         common_sentiments = self._find_common_features(sentiments, n)
         return common_sentiments
-
-    def extract_review_sentiment_features(self, review, common_sentiments):
-        # (5) Determine each review's sentiment features from within the larger set
-        review_sentiment = self.sentiment_analysis(review)
-        relevant_sentiments = self._filter_relevant_features(review_sentiment, common_sentiments)
-        return relevant_sentiments
-
-    def _find_common_features(self, features, n):
-        # Helper function to find common features
-        # ...existing code...
-
-    def _filter_relevant_features(self, features, common_features):
-        # Helper function to filter relevant features
-        # ...existing code...
-
-    def _convert_sentiment_to_scale(self, sentiment):
-        # Helper function to convert sentiment to 0-10 scale
-        # ...existing code...
